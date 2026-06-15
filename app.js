@@ -68,13 +68,16 @@ function startApp() {
     const revealed = !!data.revealed;
 
     if (!users[userId]) {
-      db.ref(`poker/users/${userId}`).set({ name: userName, vote: null });
+      // vote フィールドは意図的に省略（Firebase は null を保存しないため、
+      // undefined と null の区別がなくなり vote の有無を truthy で判定する）
+      db.ref(`poker/users/${userId}`).set({ name: userName });
+      return;
     }
 
     renderUI(users, revealed);
 
     if (!revealed && Object.keys(users).length > 0) {
-      if (Object.values(users).every(u => u.vote !== null)) {
+      if (Object.values(users).every(u => u.vote)) {
         pokerRef.child('revealed').set(true);
       }
     }
@@ -84,17 +87,18 @@ function startApp() {
 // --- Render ---
 
 function renderUI(users, revealed) {
-  const myVote = (users[userId] || {}).vote ?? null;
+  const myVote = (users[userId] || {}).vote || null;
 
-  // Participants
   const participantsEl = $('participants');
   participantsEl.innerHTML = '';
-  const entries = Object.entries(users).sort(([, a], [, b]) => a.name.localeCompare(b.name, 'ja'));
+  const sorted = Object.entries(users).sort(([, a], [, b]) =>
+    a.name.localeCompare(b.name, 'ja')
+  );
 
-  if (entries.length === 0) {
+  if (sorted.length === 0) {
     participantsEl.innerHTML = '<p class="empty">参加者がいません</p>';
   } else {
-    entries.forEach(([, user]) => {
+    sorted.forEach(([, user]) => {
       const row = document.createElement('div');
       row.className = 'participant';
 
@@ -105,10 +109,10 @@ function renderUI(users, revealed) {
       const badge = document.createElement('span');
       if (revealed) {
         badge.className = 'pvote';
-        badge.textContent = user.vote ?? '—';
+        badge.textContent = user.vote || '—';
       } else {
-        badge.className = 'pstatus ' + (user.vote !== null ? 'voted' : 'waiting');
-        badge.textContent = user.vote !== null ? '投票済み' : '未投票';
+        badge.className = `pstatus ${user.vote ? 'voted' : 'waiting'}`;
+        badge.textContent = user.vote ? '投票済み' : '未投票';
       }
 
       row.appendChild(nameEl);
@@ -117,7 +121,6 @@ function renderUI(users, revealed) {
     });
   }
 
-  // Card section
   const cardSection = $('cardSection');
   if (revealed) {
     cardSection.classList.add('hidden');
@@ -126,8 +129,7 @@ function renderUI(users, revealed) {
     document.querySelectorAll('.card').forEach(card => {
       card.classList.toggle('selected', card.dataset.value === myVote);
     });
-    const statusEl = $('myVoteStatus');
-    statusEl.innerHTML = myVote !== null ? `選択中: <strong>${myVote}</strong>` : '未投票';
+    $('myVoteStatus').innerHTML = myVote ? `選択中: <strong>${myVote}</strong>` : '未投票';
   }
 }
 
