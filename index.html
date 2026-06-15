@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning Poker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+      color: #111;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+      color: #111;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Dialog */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .dialog {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 340px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+    }
+
+    .dialog h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .dialog input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .dialog input:focus { border-color: #3b82f6; }
+
+    .dialog .btn-primary {
+      width: 100%;
+      margin-top: 10px;
+      padding: 11px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .dialog .btn-primary:hover { background: #2563eb; }
+
+    /* App */
+    #app {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* Header bar */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fff;
+      border-radius: 10px;
+      padding: 11px 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .header-name {
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    .header-name strong { color: #111; }
+
+    .btn-link {
+      background: none;
+      border: none;
+      color: #3b82f6;
+      font-size: 0.82rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .btn-link:hover { background: #eff6ff; }
+
+    /* Section */
+    .section {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    /* Participants */
+    #participants { display: flex; flex-direction: column; gap: 6px; }
+
+    .participant {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .pname { font-size: 0.92rem; font-weight: 500; }
+
+    .pstatus {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    .pstatus.voted { background: #dcfce7; color: #166534; }
+    .pstatus.waiting { background: #f3f4f6; color: #9ca3af; }
+
+    .pvote {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #3b82f6;
+      min-width: 32px;
+      text-align: right;
+    }
+
+    .empty { font-size: 0.88rem; color: #bbb; text-align: center; padding: 6px 0; }
+
+    /* Cards */
+    #myVoteStatus {
+      font-size: 0.83rem;
+      color: #888;
+      margin-bottom: 12px;
+      min-height: 1.2em;
+    }
+
+    #myVoteStatus strong { color: #3b82f6; font-size: 1rem; }
+
+    #cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .card {
+      aspect-ratio: 2 / 3;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #374151;
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s, background 0.12s, color 0.12s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.18);
+    }
+
+    .card.selected {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: #fff;
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.38);
+    }
+
+    /* Reset */
+    #btnReset {
+      width: 100%;
+      padding: 12px;
+      background: #fff;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    #btnReset:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+      background: #fef2f2;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Name dialog -->
+<div class="overlay" id="nameDialog">
+  <div class="dialog">
+    <h2>名前を入力してください</h2>
+    <input type="text" id="nameInput" placeholder="例: 田中" maxlength="20" autocomplete="off">
+    <button class="btn-primary" id="btnSaveName">参加する</button>
+  </div>
+</div>
+
+<h1>Planning Poker</h1>
+
+<div id="app" class="hidden">
+
+  <div class="header">
+    <span class="header-name">参加中: <strong id="displayName"></strong></span>
+    <button class="btn-link" id="btnChangeName">名前を変更</button>
+  </div>
+
+  <div class="section">
+    <div class="section-label">参加者</div>
+    <div id="participants"><p class="empty">読み込み中...</p></div>
+  </div>
+
+  <div class="section" id="cardSection">
+    <div class="section-label">投票</div>
+    <div id="myVoteStatus">未投票</div>
+    <div id="cards"></div>
+  </div>
+
+  <button id="btnReset">リセット</button>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
